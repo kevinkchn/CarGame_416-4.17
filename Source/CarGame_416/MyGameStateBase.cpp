@@ -44,7 +44,7 @@ AMyGameStateBase::AMyGameStateBase()
 		}
 	}
 
-	//// Add Map names to list of MapNames
+	//// Add Map names to list
 	MapNames.Add("TestRaceTagMap");
 }
 void AMyGameStateBase::GetLifetimeReplicatedProps(TArray< FLifetimeProperty > & OutLifetimeProps) const
@@ -53,7 +53,6 @@ void AMyGameStateBase::GetLifetimeReplicatedProps(TArray< FLifetimeProperty > & 
 	DOREPLIFETIME(AMyGameStateBase, NumCheckpoints);
 
 }
-////Multiplayer Chat RPC's and local functions
 void AMyGameStateBase::SendChatMessage(const FText& Content)
 {
 
@@ -67,13 +66,6 @@ bool AMyGameStateBase::NetMulticast_SendChatMessage_Validate(const FText& Conten
 {
 	return true;
 }
-
-///// Administrator chat to send too all clients
-void AMyGameStateBase::FromBP_AdminChatMessage(const FText& Content, ChatColor Color)
-{
-	NetMulticast_SendChatMessage(Content, Color);
-}
-/////RPC to tell clients to start countdown and then enable racing
 void AMyGameStateBase::StartRaceCountdown()
 {
 	NetMulticast_StartRaceCountdown();
@@ -108,7 +100,6 @@ void AMyGameStateBase::FromBP_StartRace()
 		NetMulticast_StartRace();
 }
 
-///// Server has clicked start game in Lobby and all players are ready
 void AMyGameStateBase::FromBP_StartGame()
 {
 
@@ -178,8 +169,6 @@ bool AMyGameStateBase::NetMulticast_SetMapAndMode_Validate()
 	return true;
 }
 
-
-////// End Game Requirements have been met, initiate end game sequence on client
 void AMyGameStateBase::NetMulticast_FinishGame_Implementation()
 {
 	((ACarGame_PlayerController*)UGameplayStatics::GetPlayerController(GetWorld(), 0))->Client_FinishGame();
@@ -188,11 +177,13 @@ bool AMyGameStateBase::NetMulticast_FinishGame_Validate()
 {
 	return true;
 }
+void AMyGameStateBase::FromBP_AdminChatMessage(const FText& Content, ChatColor Color)
+{
+	NetMulticast_SendChatMessage(Content, Color);
+}
 
 
-
-
-/// Implementation for updating gameplay stats
+///gameplay stats
 void AMyGameStateBase::Client_UpdatePlace_Implementation(int place)
 {
 
@@ -210,7 +201,6 @@ bool AMyGameStateBase::Client_UpdateLap_Validate(int lap)
 	return true;
 }
 
-
 void AMyGameStateBase::NetMulticast_SetGameMode_Implementation(EGameMode GM)
 {
 	CurGameMode = GM;
@@ -220,13 +210,13 @@ bool AMyGameStateBase::NetMulticast_SetGameMode_Validate(EGameMode GM)
 	return true;
 }
 
-///// Called when a racer passes through a checkpoint if any exist on the map, and updates that racer's current checkpoint
 void AMyGameStateBase::PassCheckpoint(AController* PC, int CPNum)
 {
 	ACarGame_PlayerController* CGPC = (ACarGame_PlayerController*)PC;
 	AMyPlayerState* MPS = ((AMyPlayerState*)PC->PlayerState);
 	AMyPlayerState* ItState;
-	///// If a player passes the last checkpoint check if everybody else is finished too
+	//GEngine->AddOnScreenDebugMessage(-1, 10.f, FColor::Red, FString::Printf(TEXT("Num Checkpoints: %d"), Checkpoints.Num()));
+	///// FINISH CONDITION
 	if (CPNum == 1 && MPS->LastCheckpoint == Checkpoints.Num())
 	{
 		//GEngine->AddOnScreenDebugMessage(-1, 10.f, FColor::Red, FString::Printf(TEXT("Checking Finish Condition")));
@@ -234,7 +224,6 @@ void AMyGameStateBase::PassCheckpoint(AController* PC, int CPNum)
 		MPS->bIsFinished = true;
 		CGPC->Client_EndRacing(true);
 		int i = 0;
-		////// Count the amount of players who are finished
 		for (APlayerState* It : PlayerArray)
 		{
 			AMyPlayerState* TheState = (AMyPlayerState*)It;
@@ -244,7 +233,6 @@ void AMyGameStateBase::PassCheckpoint(AController* PC, int CPNum)
 				ItState = TheState;
 			}
 		}
-		///// if all players are finished, initiate countdown then return to lobby
 		if ((PlayerArray.Num() - 1) == i)
 		{
 			NetMulticast_FinishGame();
@@ -254,7 +242,7 @@ void AMyGameStateBase::PassCheckpoint(AController* PC, int CPNum)
 
 	}
 
-	///// If it wasn't the final checkpoint, advance racer's current CHECKPOINT
+	///// OTHERWISE ADVANCE CHECKPOINT
 	if (MPS->LastCheckpoint == CPNum - 1)
 	{
 		//GEngine->AddOnScreenDebugMessage(-1, 10.f, FColor::Red, FString::Printf(TEXT("Last Checkpoint: %d"), MPS->LastCheckpoint));
@@ -263,7 +251,6 @@ void AMyGameStateBase::PassCheckpoint(AController* PC, int CPNum)
 	}
 }
 
-///// After end race conditions met and timer has finished, execute server travel back to lobby
 void AMyGameStateBase::FinishGameTimerEvent()
 {
 	if (GetWorld())
